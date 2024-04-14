@@ -1,0 +1,65 @@
+services:
+  keycloak-postgres:
+    image: library/postgres:${KC_POSTGRES_IMAGE_TAG:-16}
+    container_name: ${POSTGRES_CONTAINER_NAME:-postgres}
+    restart: on-failure
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -q -d ${POSTGRES_DB} -U ${POSTGRES_USER}"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    ports:
+      - "${KC_POSTGRES_PORT_MAPPING:-5435}:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  keycloak:
+    image: coopersoft/keycloak:21.0.1_phone-2.2.2
+    container_name: keycloak
+    environment:
+      KC_DB_URL: ${KC_DB_URL}
+      KC_DB_USERNAME: ${KC_DB_USERNAME}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_DB_SCHEMA: ${KC_DB_SCHEMA}
+      KC_FEATURES: ${KC_FEATURES}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      PHONE_PROVIDER_API_KEY: ${PHONE_PROVIDER_API_KEY}
+      KEYCLOAK_LOGLEVEL: DEBUG
+    volumes:
+      - type: bind
+        source: ./src/main/resources/keycloak/import/realm-export.json
+        target: /opt/keycloak/data/import/realm-export.json
+        read_only: true
+      - ./src/main/resources/keycloak/providers:/opt/keycloak/providers
+    command:
+      - "start-dev"
+      - "--import-realm"
+      - "--spi-phone-default-service=dummy"
+      - "--spi-phone-default-event-manager-duplicate-phone=false"
+      - "--db"
+      - "postgres"
+    ports:
+      - "8282:8080"
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - "CMD"
+        - "curl"
+        - "-f"
+        - "http://localhost:8282/realms/master"
+      start_period: 10s
+      interval: 30s
+      retries: 5
+      timeout: 60s

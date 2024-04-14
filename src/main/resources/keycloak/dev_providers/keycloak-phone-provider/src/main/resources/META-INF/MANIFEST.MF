@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Main-Class: 
+Class-Path: libphonenumber-8.13.7.jar json-20220320.jar
+
